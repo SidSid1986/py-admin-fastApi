@@ -7,11 +7,13 @@ from database import engine, Base
 from models.home_model import HomeImage       # 假设你之前的图片模型叫这个，如果文件名不同请调整
 from models.service_model import ServiceContent # <--- 刚刚新建的服务内容模型
 
-#home
+# home
 from routers.home_router import home_router
- #service
+
+# service
 from routers.service_router import service_router
-#about 关于我们
+
+# about 关于我们
 from routers.about_router import about_router
 
 # 文件
@@ -25,6 +27,9 @@ from routers.industry_router import industry_router
 
 # 解决方案
 from routers.solution_router import solution_router
+
+# 产品分类
+from routers.category_router import category_router
 
 
 
@@ -56,6 +61,9 @@ app.include_router(news_router)
 app.include_router(industry_router)
 
 app.include_router(solution_router)
+
+app.include_router(category_router)
+
 
 app.include_router(common_router)
 

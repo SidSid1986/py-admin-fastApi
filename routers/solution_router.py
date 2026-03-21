@@ -1,13 +1,12 @@
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import asc, desc
 from database import get_db
 from models.solution_model import Solution
 from models.industry_model import Industry
 from datetime import datetime
 from pydantic import BaseModel, Field
-
+from sqlalchemy import asc, desc
 solution_router = APIRouter(prefix="/solution", tags=["解决方案管理"])
 
 
@@ -92,45 +91,48 @@ def save_solution(req: SolutionSaveRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"保存失败: {str(e)}")
 
 
-# --- 3. 获取列表 ---
+
+
+
 @solution_router.get("/list", summary="获取解决方案列表")
 def get_solution_list(
-        fid: Optional[int] = Query(None, description="按行业ID筛选 (不传则获取全部)"),
+        fid: Optional[int] = Query(None, description="按行业ID筛选"),
+        keyword: Optional[str] = Query(None, description="模糊搜索标题关键词"),  # [新增] 接收关键词
         only_active: bool = Query(False, description="是否只获取启用的方案"),
         db: Session = Depends(get_db)
 ):
     query = db.query(Solution)
 
-    # 筛选条件
+    # 1. 行业筛选
     if fid is not None:
         query = query.filter(Solution.fid == fid)
 
+    # 2. [新增] 模糊搜索标题
+    if keyword:
+        # % 是通配符，表示匹配任意字符。like("%关键词%") 表示包含该关键词
+        query = query.filter(Solution.title.like(f"%{keyword}%"))
+
+    # 3. 状态筛选
     if only_active:
         query = query.filter(Solution.is_active == True)
 
-    # 排序逻辑
-    # 1. 按 sort 升序 (越小越前)
-    # 2. 按 id 降序 (同排序下，最新的在前，符合通常的列表展示习惯，也可改为 asc)
+    # 排序
     solutions = query.order_by(
         asc(Solution.sort),
         desc(Solution.id)
     ).all()
 
-    # 手动转换为字典列表
+    # ... (后续转换代码保持不变) ...
     data_list = []
     for item in solutions:
-        # 利用父子关系获取行业名称，如果行业被删了则显示"未知"
         industry_name = item.industry.name if item.industry else "未知行业"
-
         data_list.append({
             "id": item.id,
             "fid": item.fid,
-            "industry_name": industry_name,  # 额外返回行业名，方便前端展示
+            "industry_name": industry_name,
             "title": item.title,
             "cover1": item.cover1,
             "cover2": item.cover2,
-            # content 通常很长，列表页可能不需要，如果前端需要可以保留
-            # "content": item.content,
             "sort": item.sort,
             "is_active": item.is_active,
             "create_time": item.create_time.strftime("%Y-%m-%d %H:%M:%S") if item.create_time else None,
@@ -142,7 +144,6 @@ def get_solution_list(
         "msg": "获取成功",
         "data": data_list
     }
-
 
 # --- 4. 获取详情 (用于编辑回显) ---
 @solution_router.get("/detail/{solution_id}", summary="获取解决方案详情")

@@ -6,6 +6,7 @@ from .file_model import FileRecord
 from .news_model import News
 from .industry_model import Industry
 from .solution_model import Solution
+from .category_model import Category
 
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "FileRecord",
     "News",
     "Industry",
-    "Solution"
+    "Solution",
+    "Category"
 ]
