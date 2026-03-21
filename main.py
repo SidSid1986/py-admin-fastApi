@@ -20,6 +20,12 @@ from routers.file_router import file_router
 # 新闻news
 from routers.news_router import news_router
 
+# 行业
+from routers.industry_router import industry_router
+
+# 解决方案
+from routers.solution_router import solution_router
+
 
 
 #上传图片
@@ -46,6 +52,10 @@ app.include_router(about_router)
 app.include_router(file_router)
 
 app.include_router(news_router)
+
+app.include_router(industry_router)
+
+app.include_router(solution_router)
 
 app.include_router(common_router)
 

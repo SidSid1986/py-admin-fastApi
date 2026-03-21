@@ -16,7 +16,9 @@ ALLOWED_MODULES = {
     "about": "about",  # 关于我们 -> static/uploads/about
     "news": "news",  # 新闻资讯 -> static/uploads/news
     "avatar": "avatars",  # 用户头像 -> static/uploads/avatars
-    "default": ""  # 默认未分类 -> static/uploads/
+    "default": "",  # 默认未分类 -> static/uploads/
+    "industry":"industry", # 行业 -> static/uploads/industry
+    "solution":"solution", #解决方案 -> static/uploads/solution
 }
 
 
