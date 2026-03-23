@@ -7,6 +7,7 @@ from .news_model import News
 from .industry_model import Industry
 from .solution_model import Solution
 from .category_model import Category
+from .product_model import RobotProduct, SportProduct
 
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "Industry",
     "Solution",
     "Category"
+    ,"RobotProduct", "SportProduct"
 ]

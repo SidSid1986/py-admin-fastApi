@@ -31,7 +31,8 @@ from routers.solution_router import solution_router
 # 产品分类
 from routers.category_router import category_router
 
-
+# 产品
+from routers.product_router import product_router
 
 #上传图片
 from routers.common_router import common_router
@@ -63,6 +64,8 @@ app.include_router(industry_router)
 app.include_router(solution_router)
 
 app.include_router(category_router)
+
+app.include_router(product_router)
 
 
 app.include_router(common_router)
