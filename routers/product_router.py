@@ -28,6 +28,7 @@ class RobotSaveRequest(BaseModel):
     product_name: str = Field(..., min_length=1)
     model_number: str = Field(..., min_length=1)
     main_image_url: Optional[str] = None
+    robot_type: str = Field(default="", description="机器人类型")
     category_id: int = Field(..., gt=0)
     is_active: bool = True
     # 机器人特有
@@ -88,6 +89,7 @@ class RobotDetailResponse(BaseModel):
     id: int
     product_name: str
     model_number: str
+    robot_type: str
     main_image_url: Optional[str]
     category_id: int
     category_path: str
@@ -204,6 +206,7 @@ def save_robot(request: RobotSaveRequest, db: Session = Depends(get_db)):
         new_item = RobotProduct(
             product_name=request.product_name,
             model_number=request.model_number,
+            robot_type=request.robot_type,
             main_image_url=request.main_image_url,
             category_id=request.category_id,
             category_path=category_path,
@@ -237,6 +240,7 @@ def save_robot(request: RobotSaveRequest, db: Session = Depends(get_db)):
         # 逐个字段更新 (前端传什么就更新什么)
         item.product_name = request.product_name
         item.model_number = request.model_number
+        item.robot_type = request.robot_type
         if request.main_image_url is not None: item.main_image_url = request.main_image_url
         if request.category_id != item.category_id:
             item.category_id = request.category_id
@@ -373,7 +377,7 @@ def get_product_list(
             "mainImageUrl": item.main_image_url,
             "categoryId": item.category_id,
             "categoryPath": item.category_path,
-            "productType": p_type,
+            "robotType": item.robot_type,
             "isActive": item.is_active,
             "createTime": item.created_at.strftime("%Y-%m-%d %H:%M:%S") if item.created_at else None
         })

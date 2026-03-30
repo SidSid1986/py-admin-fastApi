@@ -40,6 +40,7 @@ class RobotProduct(Base):
     # --- 通用产品信息 ---
     product_name: Mapped[str] = mapped_column(String(200), nullable=False, comment="产品名称")
     model_number: Mapped[str] = mapped_column(String(100), nullable=False, comment="产品型号")
+    robot_type: Mapped[str] = mapped_column(String(50), nullable=False, default="", comment="机器人类型")
     main_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True, comment="产品主图URL")
 
     # --- 机器人特有参数 (根据之前的表单设计) ---
@@ -94,6 +95,7 @@ class SportProduct(Base):
     # --- 通用产品信息 ---
     product_name: Mapped[str] = mapped_column(String(200), nullable=False, comment="产品名称")
     model_number: Mapped[str] = mapped_column(String(100), nullable=False, comment="产品型号")
+    robot_type: Mapped[str] = mapped_column(String(50), nullable=False, default="", comment="机器人类型")
     main_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True, comment="产品主图URL")
 
     # --- 运动控制器特有参数 ---
