@@ -90,39 +90,43 @@ def save_solution(req: SolutionSaveRequest, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"保存失败: {str(e)}")
 
-
-
+    # ... 其他导入保持不变 ...
 
 
 @solution_router.get("/list", summary="获取解决方案列表")
 def get_solution_list(
         fid: Optional[int] = Query(None, description="按行业ID筛选"),
-        keyword: Optional[str] = Query(None, description="模糊搜索标题关键词"),  # [新增] 接收关键词
+        keyword: Optional[str] = Query(None, description="模糊搜索标题关键词"),
         only_active: bool = Query(False, description="是否只获取启用的方案"),
+        # --- 1. 分页参数 ---
+        page: int = Query(1, ge=1, description="页码，从1开始"),
+        page_size: int = Query(10, ge=1, le=100, description="每页数量，范围1-100"),
         db: Session = Depends(get_db)
 ):
     query = db.query(Solution)
 
-    # 1. 行业筛选
+    # 2. 应用筛选条件
     if fid is not None:
         query = query.filter(Solution.fid == fid)
 
-    # 2. [新增] 模糊搜索标题
     if keyword:
-        # % 是通配符，表示匹配任意字符。like("%关键词%") 表示包含该关键词
         query = query.filter(Solution.title.like(f"%{keyword}%"))
 
-    # 3. 状态筛选
     if only_active:
         query = query.filter(Solution.is_active == True)
 
-    # 排序
+    # --- 3. 计算总数 (用于前端展示总页数) ---
+    # 注意：必须在应用分页(.offset/.limit)之前进行计数
+    total = query.count()
+
+    # --- 4. 应用分页和排序 ---
+    offset = (page - 1) * page_size
     solutions = query.order_by(
         asc(Solution.sort),
         desc(Solution.id)
-    ).all()
+    ).offset(offset).limit(page_size).all()
 
-    # ... (后续转换代码保持不变) ...
+    # 5. 转换数据
     data_list = []
     for item in solutions:
         industry_name = item.industry.name if item.industry else "未知行业"
@@ -139,10 +143,15 @@ def get_solution_list(
             "update_time": item.update_time.strftime("%Y-%m-%d %H:%M:%S") if item.update_time else None,
         })
 
+    # --- 6. 返回调整后的响应结构 ---
     return {
         "code": 200,
         "msg": "获取成功",
-        "data": data_list
+        "data": data_list,  # 直接返回数据列表
+        "total": total,  # 数据总条数 (与 data 平级)
+        "page": page,  # 当前页码
+        "page_size": page_size,  # 每页数量
+        "pages": (total + page_size - 1) // page_size  # 总页数
     }
 
 # --- 4. 获取详情 (用于编辑回显) ---

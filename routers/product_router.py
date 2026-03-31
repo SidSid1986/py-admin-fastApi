@@ -326,15 +326,20 @@ def save_sport(request: SportSaveRequest, db: Session = Depends(get_db)):
 
 
 # --- 📋 列表接口 ---
+from sqlalchemy import or_, desc
+
+
 @product_router.get("/list", summary="获取产品列表")
 def get_product_list(
         page: int = Query(1, ge=1),
         page_size: int = Query(10, ge=1, le=100),
-        keyword: Optional[str] = Query(None),
+        keyword: Optional[str] = Query(None, description="搜索产品名称"),  # 保持原有逻辑，专用于名称
+        model_number: Optional[str] = Query(None, description="搜索产品型号"),  # [新增] 专用于型号搜索
         category_id: Optional[int] = Query(None),
         product_type: Optional[str] = Query(None),
         db: Session = Depends(get_db)
 ):
+    # 1. 确定要查询的模型列表
     models_to_query = []
     if product_type == "ROBOT":
         models_to_query.append(RobotProduct)
@@ -343,33 +348,55 @@ def get_product_list(
     else:
         models_to_query = [RobotProduct, SportProduct]
 
-    all_results = []
-    total = 0
+    all_items = []
+    total_count = 0
 
+    # 2. 循环查询每个模型
     for model in models_to_query:
         q = db.query(model)
+
+        # --- 筛选逻辑 ---
+
+        # 构建搜索条件列表
+        search_conditions = []
+
+        # 1. 如果传了 keyword，加入名称搜索条件
         if keyword:
-            q = q.filter(or_(model.product_name.contains(keyword), model.model_number.contains(keyword)))
+            search_conditions.append(model.product_name.contains(keyword))
+
+        # 2. [新增] 如果传了 model_number，加入型号搜索条件
+        if model_number:
+            search_conditions.append(model.model_number.contains(model_number))
+
+        # 3. 应用搜索条件 (使用 or_ 连接，表示满足任意一个即可)
+        if search_conditions:
+            q = q.filter(or_(*search_conditions))
+
+        # 分类筛选
         if category_id:
             q = q.filter(model.category_id == category_id)
 
-        total += q.count()
+        # --- 统计总数 ---
+        count = q.count()
+        total_count += count
 
-        if len(models_to_query) > 1:
-            items = q.order_by(desc(model.created_at)).all()
-        else:
-            items = q.order_by(desc(model.created_at)).offset((page - 1) * page_size).limit(page_size).all()
+        # --- 获取数据 ---
+        items = q.order_by(desc(model.created_at)).all()
+        all_items.extend(items)
 
-        p_type = "ROBOT" if model == RobotProduct else "SPORT_CONTROLLER"
-        all_results.extend([(item, p_type) for item in items])
+    # 3. 内存中合并排序
+    all_items.sort(key=lambda x: x.created_at, reverse=True)
 
-    if len(models_to_query) > 1:
-        all_results.sort(key=lambda x: x[0].created_at, reverse=True)
-        start = (page - 1) * page_size
-        all_results = all_results[start:start + page_size]
+    # 4. 内存中分页切片
+    start = (page - 1) * page_size
+    end = start + page_size
+    paginated_items = all_items[start:end]
 
+    # 5. 构建返回数据
     data_list = []
-    for item, p_type in all_results:
+    for item in paginated_items:
+        p_type = "ROBOT" if isinstance(item, RobotProduct) else "SPORT_CONTROLLER"
+
         data_list.append({
             "id": item.id,
             "productName": item.product_name,
@@ -378,12 +405,19 @@ def get_product_list(
             "categoryId": item.category_id,
             "categoryPath": item.category_path,
             "robotType": item.robot_type,
+            "productType": p_type,
             "isActive": item.is_active,
             "createTime": item.created_at.strftime("%Y-%m-%d %H:%M:%S") if item.created_at else None
         })
 
-    return {"code": 200, "msg": "success", "total": total, "data": data_list}
-
+    return {
+        "code": 200,
+        "msg": "success",
+        "total": total_count,
+        "page": page,
+        "page_size": page_size,
+        "data": data_list
+    }
 
 # --- 🗑️ 删除接口 ---
 @product_router.delete("/{product_id}", summary="删除产品")

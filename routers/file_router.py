@@ -4,7 +4,7 @@ import shutil
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc,or_
 from database import get_db
 from models.file_model import FileRecord
 from datetime import datetime
@@ -111,23 +111,39 @@ async def upload_file(
 
 
 # --- 2. 获取文件列表接口 ---
+from sqlalchemy import desc, or_ # 确保导入 or_，虽然单字段搜索可能不需要，但搜索常用
+
+# ... (前面的代码保持不变)
+
+# --- 2. 获取文件列表接口 ---
 @file_router.get("/list", summary="获取文件列表", response_model=FileListResponse)
 def get_file_list(
         page: int = Query(1, ge=1, description="页码"),
         page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+        keyword: Optional[str] = Query(None, description="文件名搜索关键字"), # 1. 新增 keyword 参数
         db: Session = Depends(get_db)
 ):
     """
-    分页获取文件列表，按上传时间倒序
+    分页获取文件列表，支持按文件名模糊搜索，按上传时间倒序
     """
     # 计算偏移量
     offset = (page - 1) * page_size
 
-    # 查询总数
-    total = db.query(FileRecord).count()
+    # 2. 构建基础查询对象
+    query = db.query(FileRecord)
 
-    # 查询当前页数据 (按时间倒序)
-    records = db.query(FileRecord) \
+    # 3. 如果有搜索关键字，添加模糊查询条件
+    if keyword:
+        # 使用 ilike 进行不区分大小写的模糊匹配 (PostgreSQL/SQLite 支持)
+        # 如果是 MySQL，通常使用 like
+        # %keyword% 表示包含该字符串
+        query = query.filter(FileRecord.original_name.ilike(f"%{keyword}%"))
+
+    # 4. 查询总数 (必须在分页前查询，且包含搜索条件)
+    total = query.count()
+
+    # 5. 查询当前页数据 (按时间倒序，应用分页)
+    records = query \
         .order_by(desc(FileRecord.upload_time)) \
         .offset(offset) \
         .limit(page_size) \

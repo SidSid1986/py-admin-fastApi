@@ -124,34 +124,54 @@ def get_news_list(
         keyword: Optional[str] = Query(None, description="搜索标题关键字"),
         db: Session = Depends(get_db)
 ):
-    query = db.query(News)
-
-    # 支持标题或简介搜索
+    # 1. 构建基础查询 (处理搜索)
+    base_query = db.query(News)
     if keyword:
-        query = query.filter(
+        base_query = base_query.filter(
             (News.title.contains(keyword)) |
             (News.summary.contains(keyword))
         )
 
-    # 排序：置顶优先 -> 时间倒序
-    query = query.order_by(desc(News.is_top), desc(News.publish_date))
+    # ==========================================
+    # 核心修改：分离查询策略
+    # ==========================================
 
-    total = query.count()
+    # --- 第一步：单独查出所有“置顶”数据 ---
+    # 这部分数据不参与分页计算，永远作为“赠品”返回
+    top_query = base_query.filter(News.is_top == True)
+    top_items = top_query.order_by(desc(News.publish_date)).all()
+
+    # --- 第二步：针对“非置顶”数据进行严格分页 ---
+    normal_query = base_query.filter(News.is_top == False)
+
+    # 计算普通数据的总数（用于前端计算总页数，注意这里只算普通的）
+    total_normal_count = normal_query.count()
+
+    # 计算偏移量：只根据普通数据的数量来算
+    # 例如 page=1, page_size=8 -> offset=0
+    # 例如 page=2, page_size=8 -> offset=8
     offset = (page - 1) * page_size
-    items = query.offset(offset).limit(page_size).all()
 
+    # 获取当前页的普通数据（严格限制数量）
+    normal_items = normal_query.order_by(desc(News.publish_date)).offset(offset).limit(page_size).all()
+
+    # --- 第三步：合并数据 ---
+    # 最终列表 = 置顶列表 + 当前页的普通列表
+    # 结果长度 = 置顶数量 + page_size
+    items = top_items + normal_items
+
+    # 关于 total 的返回：
+    # 建议返回 total_normal_count，这样前端分页组件计算的页数是准确的（基于普通数据量）。
+    # 如果返回 total_all (包含置顶)，前端页码可能会多算一页（因为置顶占了位置但没占页码）。
+
+    # 数据格式化
     data_list = []
     for item in items:
-        # 【关键修改】列表页只返回必要的摘要信息，不返回庞大的 content 富文本
-        # 如果数据库里 summary 为空，这里就返回空字符串，让前端显示“暂无简介”
         current_summary = item.summary if item.summary else ""
-
         data_list.append({
             "id": item.id,
             "title": item.title,
-            "summary": current_summary,  # 核心字段：简介
-            # "name": current_summary,   # 【删除】如果前端已经改用 summary，则删除此兼容字段
-            # "content": item.content,   # 【删除】列表页严禁返回完整富文本，性能太差！
+            "summary": current_summary,
             "pic": item.cover_image or "",
             "date": item.publish_date.strftime("%Y-%m-%d") if item.publish_date else "",
             "isTop": item.is_top
@@ -160,10 +180,9 @@ def get_news_list(
     return {
         "code": 200,
         "msg": "获取成功",
-        "total": total,
-        "data": data_list
+        "total": total_normal_count,  # 【关键点】这里返回普通数据的总数，方便前端计算纯数字页码
+        "data": data_list  # 但 data 数组里包含了 置顶 + 普通
     }
-
 
 # --- 删除新闻 ---
 @news_router.delete("/delete/{news_id}", summary="删除新闻")
