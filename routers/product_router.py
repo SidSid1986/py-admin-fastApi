@@ -2,6 +2,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_
+
 from database import get_db
 from models.product_model import RobotProduct, SportProduct
 from models.category_model import Category
@@ -60,6 +61,7 @@ class SportSaveRequest(BaseModel):
     main_image_url: Optional[str] = None
     category_id: int = Field(..., gt=0)
     is_active: bool = True
+    robot_type: str = Field(default="")
     # 控制器特有
     name: str = Field(..., min_length=1)
     detail: Optional[str] = None
@@ -278,6 +280,7 @@ def save_sport(request: SportSaveRequest, db: Session = Depends(get_db)):
             product_name=request.product_name,
             model_number=request.model_number,
             main_image_url=request.main_image_url,
+            robot_type=request.robot_type,
             category_id=request.category_id,
             category_path=category_path,
             is_active=request.is_active,
@@ -304,6 +307,7 @@ def save_sport(request: SportSaveRequest, db: Session = Depends(get_db)):
 
         item.product_name = request.product_name
         item.model_number = request.model_number
+        item.robot_type = request.robot_type
         if request.main_image_url is not None: item.main_image_url = request.main_image_url
         if request.category_id != item.category_id:
             item.category_id = request.category_id
@@ -325,8 +329,7 @@ def save_sport(request: SportSaveRequest, db: Session = Depends(get_db)):
         return {"code": 200, "msg": "更新成功", "data": {"id": item.id}}
 
 
-# --- 📋 列表接口 ---
-from sqlalchemy import or_, desc
+
 
 
 @product_router.get("/list", summary="获取产品列表")
