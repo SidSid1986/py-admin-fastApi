@@ -5,14 +5,15 @@ from sqlalchemy import desc, or_
 
 from database import get_db
 from models.product_model import RobotProduct, SportProduct
+from typing import Optional, List, Dict, Type # 导入 Type 用于类型注解
 from models.category_model import Category
 from datetime import datetime
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import DeclarativeMeta
 
 # 如果是 Pydantic V2，需要 ConfigDict；如果是 V1，使用 class Config
 try:
     from pydantic import ConfigDict
-
     PYDANTIC_V2 = True
 except ImportError:
     PYDANTIC_V2 = False
@@ -63,7 +64,7 @@ class SportSaveRequest(BaseModel):
     is_active: bool = True
     robot_type: str = Field(default="")
     # 控制器特有
-    name: str = Field(..., min_length=1)
+    name: Optional[str] = Field(None, description="控制器名称")
     detail: Optional[str] = None
     img: Optional[str] = None
     line1: Optional[str] = None
@@ -114,7 +115,7 @@ class RobotDetailResponse(BaseModel):
     detail_img: Optional[str]
 
     # 额外标记类型，方便前端判断
-    product_type: str = "ROBOT"
+    product_type: str = "robot"
 
     if PYDANTIC_V2:
         model_config = ConfigDict(from_attributes=True)
@@ -135,7 +136,7 @@ class SportDetailResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime]
     # 特有字段
-    name: str
+    name: Optional[str] = None
     detail: Optional[str]
     img: Optional[str]
     line1: Optional[str]
@@ -145,13 +146,30 @@ class SportDetailResponse(BaseModel):
     sport_pram_two: Optional[dict]
 
     # 额外标记类型
-    product_type: str = "SPORT_CONTROLLER"
+    product_type: str = "sport" # 注意：这里的 product_type 值可以根据需要决定是否同步修改
 
     if PYDANTIC_V2:
         model_config = ConfigDict(from_attributes=True)
     else:
         class Config:
             orm_mode = True
+
+# 产品类型映射 后面通过类型查询时候增加类型到这里
+PRODUCT_TYPE_MAPPING: Dict[str, Dict] = {
+    "robot": {
+        "model": RobotProduct,
+        "response_schema": RobotDetailResponse
+    },
+    "sport": {
+        "model": SportProduct,
+        "response_schema": SportDetailResponse
+    },
+    # 当未来需要添加新产品类型时，只需在这里追加一行：
+    # "new_type_name": { # 小写形式
+    #     "model": NewProductModel,
+    #     "response_schema": NewProductDetailResponse
+    # }
+}
 
 
 # =============================================================================
@@ -179,23 +197,30 @@ def get_category_path(db: Session, category_id: int) -> str:
 # =============================================================================
 
 # --- 🆕 获取详情 (核心：直接查库，直接返回，不做复杂转换) ---
-@product_router.get("/detail/{product_id}", summary="获取产品详情 (直接回显)")
-def get_product_detail(product_id: int, db: Session = Depends(get_db)):
-    # 1. 先查机器人表
-    item = db.query(RobotProduct).filter(RobotProduct.id == product_id).first()
-    if item:
-        response_data = RobotDetailResponse.from_orm(item) if not PYDANTIC_V2 else RobotDetailResponse.model_validate(item)
+@product_router.get("/detail/{product_type}/{product_id}", summary="获取产品详情 (按类型区分)")
+def get_product_detail(product_type: str, product_id: int, db: Session = Depends(get_db)):
+    # 1. 从映射字典中查找对应的模型和响应类
+    product_info = PRODUCT_TYPE_MAPPING.get(product_type.lower()) # 使用 .lower() 来匹配映射字典中的小写键
 
-        return {"code": 200, "msg": "success", "data": response_data}
+    # 2. 如果找不到对应的类型，则抛出 404 错误
+    if not product_info:
+        raise HTTPException(status_code=404, detail=f"Unknown product type: {product_type}")
 
-    # 2. 再查控制器表
-    item = db.query(SportProduct).filter(SportProduct.id == product_id).first()
-    if item:
-        response_data = SportDetailResponse.from_orm(item) if not PYDANTIC_V2 else SportDetailResponse.model_validate(item)
+    # 3. 获取模型和响应类
+    ModelClass: Type[DeclarativeMeta] = product_info["model"]
+    ResponseSchema = product_info["response_schema"]
 
-        return {"code": 200, "msg": "success", "data": response_data}
+    # 4. 根据获取到的模型进行查询
+    item = db.query(ModelClass).filter(ModelClass.id == product_id).first()
 
-    raise HTTPException(status_code=404, detail="产品不存在")
+    # 5. 如果没找到具体条目，则抛出 404 错误
+    if not item:
+        raise HTTPException(status_code=404, detail=f"{product_type} 产品不存在 (ID: {product_id})")
+
+    # 6. 使用获取到的响应类进行序列化
+    response_data = ResponseSchema.model_validate(item)  # 使用 model_validate
+
+    return {"code": 200, "msg": "success", "data": response_data}
 
 
 # --- 🤖 机器人保存 ---
@@ -329,9 +354,6 @@ def save_sport(request: SportSaveRequest, db: Session = Depends(get_db)):
         return {"code": 200, "msg": "更新成功", "data": {"id": item.id}}
 
 
-
-
-
 @product_router.get("/list", summary="获取产品列表")
 def get_product_list(
         page: int = Query(1, ge=1),
@@ -344,9 +366,9 @@ def get_product_list(
 ):
     # 1. 确定要查询的模型列表
     models_to_query = []
-    if product_type == "ROBOT":
+    if product_type == "robot": # 查询时也用小写
         models_to_query.append(RobotProduct)
-    elif product_type == "SPORT_CONTROLLER":
+    elif product_type == "sport": # 查询时也用小写
         models_to_query.append(SportProduct)
     else:
         models_to_query = [RobotProduct, SportProduct]
@@ -398,7 +420,7 @@ def get_product_list(
     # 5. 构建返回数据
     data_list = []
     for item in paginated_items:
-        p_type = "ROBOT" if isinstance(item, RobotProduct) else "SPORT_CONTROLLER"
+        p_type = "robot" if isinstance(item, RobotProduct) else "sport"
 
         data_list.append({
             "id": item.id,

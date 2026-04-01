@@ -25,7 +25,7 @@ class Category(Base):
     # --- 【新增】产品类型标识字段 ---
     # 仅当 parent_id 为 NULL (一级分类) 时填写此字段
     # 子分类自动继承父级的 type，无需重复存储，或在逻辑层处理
-    # 枚举值示例: "ROBOT", "SPORT_CONTROLLER", "SERVO_DRIVER", "SENSOR"
+    # 枚举值示例: "robot", "sport", "servo", "sensor"
     category_type = Column(String(50), nullable=True, index=True, comment="产品类型标识 (仅一级分类有效)")
 
     # --- 其他业务字段 ---

@@ -9,10 +9,10 @@ category_router = APIRouter(prefix="/category", tags=["产品分类管理"])
 
 # --- 类型映射字典 (统一管理中英文) ---
 TYPE_MAP: Dict[str, str] = {
-    "ROBOT": "机器人",
-    "SPORT_CONTROLLER": "运动控制器",
-    "SERVO_DRIVER": "伺服驱动器",
-    "SENSOR": "传感器"
+    "robot": "机器人",
+    "sport": "运动控制器",
+    "servo": "伺服驱动器",
+    "sensor": "传感器"
 }
 
 
