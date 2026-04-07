@@ -18,8 +18,6 @@ class RobotProduct(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True, autoincrement=True)
 
     # --- 关联分类 (外键) ---
-    # 关键点：使用字符串 "categories.id" 引用，不需要导入 Category 类
-    # ondelete="RESTRICT": 如果该分类下有产品，禁止删除分类，保护数据
     category_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("categories.id", ondelete="RESTRICT"),
@@ -28,11 +26,11 @@ class RobotProduct(Base):
         comment="所属分类ID (叶子节点)"
     )
 
-    # 冗余字段：存储分类路径快照，方便列表页直接显示，无需连表查询
     category_path: Mapped[str | None] = mapped_column(String(200), nullable=True, comment="分类路径快照")
 
     # --- 基础状态 ---
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否上架")
+    if_main: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否首页展示")  # ✅ 已加
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now,
                                                  comment="更新时间")
@@ -43,7 +41,7 @@ class RobotProduct(Base):
     robot_type: Mapped[str] = mapped_column(String(50), nullable=False, default="", comment="机器人类型")
     main_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True, comment="产品主图URL")
 
-    # --- 机器人特有参数 (根据之前的表单设计) ---
+    # --- 机器人特有参数 ---
     robot_name: Mapped[str] = mapped_column(String(100), nullable=False, comment="机器人型号标识")
     max_arm_span: Mapped[str | None] = mapped_column(String(50), nullable=True, comment="最大臂展")
     max_weight: Mapped[str | None] = mapped_column(String(50), nullable=True, comment="最大负载")
@@ -62,6 +60,7 @@ class RobotProduct(Base):
     __table_args__ = (
         Index('idx_robot_category', 'category_id'),
         Index('idx_robot_active', 'is_active'),
+        Index('idx_robot_main', 'if_main'),  # ✅ 索引也加了
         Index('idx_robot_model', 'model_number'),
     )
 
@@ -88,6 +87,7 @@ class SportProduct(Base):
 
     # --- 基础状态 ---
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否上架")
+    if_main: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否首页展示")  # ✅ 已加
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now,
                                                  comment="更新时间")
@@ -108,7 +108,7 @@ class SportProduct(Base):
     line2: Mapped[str | None] = mapped_column(Text, nullable=True, comment="卖点2")
     line3: Mapped[str | None] = mapped_column(Text, nullable=True, comment="卖点3")
 
-    # JSON 字段 (用于存储动态的配件列表、轴配置等)
+    # JSON 字段
     sport_pram: Mapped[dict | list | None] = mapped_column(MySQLJSON, nullable=True, comment="配件列表 (JSON)")
     sport_pram_two: Mapped[dict | list | None] = mapped_column(MySQLJSON, nullable=True, comment="轴配置选项 (JSON)")
 
@@ -116,12 +116,6 @@ class SportProduct(Base):
     __table_args__ = (
         Index('idx_sport_category', 'category_id'),
         Index('idx_sport_active', 'is_active'),
+        Index('idx_sport_main', 'if_main'),  # ✅ 索引也加了
         Index('idx_sport_model', 'model_number'),
     )
-
-# =============================================================================
-# 【预留】未来如果需要添加伺服控制器，复制上面的类修改即可
-# =============================================================================
-# class ServoProduct(Base):
-#     __tablename__ = "servos"
-#     # ... 类似结构 ...
