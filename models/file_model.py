@@ -12,13 +12,13 @@ class FileRecord(Base):
     # 原始文件名 (例如: "报告.pdf")
     original_name = Column(String(255), nullable=False, index=True, comment="原始文件名")
 
-    # 存储的文件名 (UUID + 后缀，防止重名，例如: "a1b2c3.pdf")
+    # 存储的文件名 (UUID + 后缀，例如: "a1b2c3.pdf")
     stored_name = Column(String(255), nullable=False, unique=True, comment="存储文件名")
 
     # 文件相对路径 (例如: "/static/uploads/files/a1b2c3.pdf")
     file_path = Column(String(500), nullable=False, comment="文件访问路径")
 
-    # 文件大小 (单位：字节)
+    # 文件大小
     file_size = Column(BigInteger, nullable=False, comment="文件大小(字节)")
 
     # 文件类型/MIME (例如: "application/pdf")

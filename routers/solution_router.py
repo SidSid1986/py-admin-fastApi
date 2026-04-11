@@ -10,7 +10,7 @@ from sqlalchemy import asc, desc
 solution_router = APIRouter(prefix="/solution", tags=["解决方案管理"])
 
 
-# --- 1. 统一定义接收数据的模型 (仅用于校验输入) ---
+
 class SolutionSaveRequest(BaseModel):
     id: Optional[int] = Field(None, description="方案ID (有则更新，无则新增)")
     fid: int = Field(..., description="所属行业ID")
@@ -22,7 +22,7 @@ class SolutionSaveRequest(BaseModel):
     is_active: Optional[bool] = Field(True, description="是否启用")
 
 
-# --- 2. 统一保存接口 (新增/更新 二合一) ---
+# --- 统一保存接口  ---
 @solution_router.post("/save", summary="保存解决方案 (新增或更新)")
 def save_solution(req: SolutionSaveRequest, db: Session = Depends(get_db)):
     """
@@ -57,7 +57,7 @@ def save_solution(req: SolutionSaveRequest, db: Session = Depends(get_db)):
         if not solution:
             raise HTTPException(status_code=404, detail="解决方案记录不存在")
 
-        # 如果更新了行业ID，需要再次校验新行业是否存在
+        # 如果更新了行业ID，再次校验新行业是否存在
         if solution.fid != req.fid:
             new_industry = db.query(Industry).filter(Industry.id == req.fid).first()
             if not new_industry:
@@ -80,7 +80,7 @@ def save_solution(req: SolutionSaveRequest, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(solution_record)
 
-        # 【关键】手动构建返回字典，只返回必要信息 (id)，避免直接返回 ORM 对象
+        #  手动构建返回字典，只返回必要信息 (id)
         return {
             "code": 200,
             "msg": "保存成功",
@@ -90,22 +90,20 @@ def save_solution(req: SolutionSaveRequest, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"保存失败: {str(e)}")
 
-    # ... 其他导入保持不变 ...
-
 
 @solution_router.get("/list", summary="获取解决方案列表")
 def get_solution_list(
         fid: Optional[int] = Query(None, description="按行业ID筛选"),
         keyword: Optional[str] = Query(None, description="模糊搜索标题关键词"),
         only_active: bool = Query(False, description="是否只获取启用的方案"),
-        # --- 1. 分页参数 ---
+
         page: int = Query(1, ge=1, description="页码，从1开始"),
         page_size: int = Query(10, ge=1, le=100, description="每页数量，范围1-100"),
         db: Session = Depends(get_db)
 ):
     query = db.query(Solution)
 
-    # 2. 应用筛选条件
+    #  应用筛选条件
     if fid is not None:
         query = query.filter(Solution.fid == fid)
 
@@ -115,18 +113,17 @@ def get_solution_list(
     if only_active:
         query = query.filter(Solution.is_active == True)
 
-    # --- 3. 计算总数 (用于前端展示总页数) ---
-    # 注意：必须在应用分页(.offset/.limit)之前进行计数
+    # ---  计算总数  ---
     total = query.count()
 
-    # --- 4. 应用分页和排序 ---
+    # --- 应用分页和排序 ---
     offset = (page - 1) * page_size
     solutions = query.order_by(
         asc(Solution.sort),
         desc(Solution.id)
     ).offset(offset).limit(page_size).all()
 
-    # 5. 转换数据
+    # 转换数据
     data_list = []
     for item in solutions:
         industry_name = item.industry.name if item.industry else "未知行业"
@@ -143,7 +140,7 @@ def get_solution_list(
             "update_time": item.update_time.strftime("%Y-%m-%d %H:%M:%S") if item.update_time else None,
         })
 
-    # --- 6. 返回调整后的响应结构 ---
+
     return {
         "code": 200,
         "msg": "获取成功",
@@ -171,7 +168,7 @@ def get_solution_detail(solution_id: int, db: Session = Depends(get_db)):
         "title": solution.title,
         "cover1": solution.cover1,
         "cover2": solution.cover2,
-        "content": solution.content,  # 详情页必须返回内容
+        "content": solution.content,
         "sort": solution.sort,
         "is_active": solution.is_active,
         "create_time": solution.create_time.strftime("%Y-%m-%d %H:%M:%S") if solution.create_time else None,
@@ -192,8 +189,8 @@ def delete_solution(solution_id: int, db: Session = Depends(get_db)):
     if not solution:
         raise HTTPException(status_code=404, detail="解决方案记录不存在")
 
-    # 注意：由于模型中定义了 cascade="all, delete-orphan" 和 ondelete="CASCADE"
-    # 这里直接 delete 即可，数据库会处理关联逻辑（虽然这里没有子子表）
+    #  由于模型中定义了 cascade="all, delete-orphan" 和 ondelete="CASCADE"
+    # delete数据库处理关联逻辑
     db.delete(solution)
     db.commit()
 

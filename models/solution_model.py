@@ -11,9 +11,9 @@ class Solution(Base):
     # --- 主键 ---
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
 
-    # --- 外键 (隶属于 Industry) ---
-    # ondelete="CASCADE" 表示如果行业被删除，该行业下的解决方案也会自动删除
-    # 如果希望行业删除后解决方案保留但 industry_id 为空，则去掉 ondelete 或设为 SET NULL (需允许 nullable=True)
+    # --- 外键 (属于 Industry) ---
+    # ondelete="CASCADE"如果行业被删除，该行业下的解决方案也会自动删除
+
     fid = Column(Integer, ForeignKey("industries.id", ondelete="CASCADE"), nullable=False, index=True,
                  comment="所属行业ID")
 
@@ -37,7 +37,7 @@ class Solution(Base):
     update_time = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
     # --- 关系定义 (反向关联) ---
-    # 通过 industry.solutions 可以访问该行业下的所有解决方案列表
+    # 通过 industry.solutions 访问该行业下的所有解决方案列表
     industry = relationship("Industry", back_populates="solutions")
 
     def __repr__(self):

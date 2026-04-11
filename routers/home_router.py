@@ -34,7 +34,7 @@ def get_index_images(db: Session = Depends(get_db)):
         HomeImage.is_active == True
     ).order_by(HomeImage.sort.asc()).all()
 
-    # 查询 Footer (通常只有一个)
+    # 查询 Footer
     footer = db.query(HomeImage).filter(
         HomeImage.type == "footer",
         HomeImage.is_active == True
@@ -48,7 +48,7 @@ def get_index_images(db: Session = Depends(get_db)):
                 "id": img.id,
                 "img_url": img.img_url,
                 "sort": img.sort,
-                "original_name": getattr(img, 'original_name', None)  # 新增
+                "original_name": getattr(img, 'original_name', None)
             } for img in banners
         ],
         "cores": [
@@ -56,13 +56,13 @@ def get_index_images(db: Session = Depends(get_db)):
                 "id": img.id,
                 "img_url": img.img_url,
                 "sort": img.sort,
-                "original_name": getattr(img, 'original_name', None)  # 新增
+                "original_name": getattr(img, 'original_name', None)
             } for img in cores
         ],
         "footer": {
             "id": footer.id,
             "img_url": footer.img_url,
-            "original_name": getattr(footer, 'original_name', None)  # 新增
+            "original_name": getattr(footer, 'original_name', None)
         } if footer else None
     }
 
@@ -76,16 +76,16 @@ async def upload_image(
         sort: int = Form(default=0),
         db: Session = Depends(get_db)
 ):
-    # 1. 验证文件类型
+    # 验证文件类型
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="只能上传图片文件")
 
-    # 2. 验证类型参数
+    # 验证类型参数
     allowed_types = ["banner", "core", "footer"]
     if img_type not in allowed_types:
         raise HTTPException(status_code=400, detail=f"类型错误，必须是 {allowed_types}")
 
-    # 3. 提取原始文件名和后缀
+    # 提取原始文件名和后缀
     original_filename = file.filename or "unknown.png"
     # 安全提取后缀，防止文件名中没有点
     if "." in original_filename:
@@ -93,31 +93,31 @@ async def upload_image(
     else:
         file_extension = "jpg"
 
-    # 限制后缀白名单 (可选，增强安全)
+    # 限制后缀白名单
     allowed_extensions = ["jpg", "jpeg", "png", "gif", "webp"]
     if file_extension not in allowed_extensions:
         raise HTTPException(status_code=400, detail=f"不支持的图片格式：{file_extension}")
 
-    # 4. 生成唯一的物理文件名 (UUID)
+    # 生成唯一的物理文件名 (UUID)
     unique_filename = f"{uuid.uuid4()}.{file_extension}"
 
-    # 5. 构建保存路径
+    # 构建保存路径
     file_path = os.path.join(UPLOAD_DIR, unique_filename)
 
-    # 6. 保存文件到磁盘
+    # 保存文件到磁盘
     try:
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
     except Exception as e:
-        # 如果保存失败，尝试删除可能产生的空文件
+        # 如果保存失败， 删除空文件
         if os.path.exists(file_path):
             os.remove(file_path)
         raise HTTPException(status_code=500, detail=f"文件保存失败：{str(e)}")
 
-    # 7. 生成访问 URL
+    # 生成访问 URL
     image_url = f"/static/uploads/{unique_filename}"
 
-    # 8. 写入数据库
+    # 写入数据库
     new_image = HomeImage(
         img_url=image_url,
         type=img_type,
@@ -132,12 +132,6 @@ async def upload_image(
     db.commit()
     db.refresh(new_image)
 
-    # 🔍【新增调试代码】在返回前打印到终端
-    print("=" * 50)
-    print(f"🔍 DEBUG: new_image.id = {new_image.id}")
-    print(f"🔍 DEBUG: new_image.original_name 类型 = {type(new_image.original_name)}")
-    print(f"🔍 DEBUG: new_image.original_name 值 = '{new_image.original_name}'")
-
     # 检查字典构建过程
     response_data = {
         "id": new_image.id,
@@ -145,11 +139,10 @@ async def upload_image(
         "type": img_type,
         "original_name": new_image.original_name
     }
-    print(f"🔍 DEBUG: 准备返回的字典内容 = {response_data}")
-    print("=" * 50)
+
     return {
         "code": 200,
-        "msg": "✅ 测试成功：代码已更新！原始文件名是：" + str(original_filename),  # 修改这里
+        "msg": "测试成功：代码已更新！原始文件名是：" + str(original_filename),
         "data": {
             "id": new_image.id,
             "img_url": image_url,
@@ -167,13 +160,13 @@ def delete_image(image_id: int, db: Session = Depends(get_db)):
 
     # ===  物理文件删除逻辑 ===
     try:
-        # 1. 获取数据库中的相对路径 (例如："/static/uploads/xxx.png")
+        # 获取数据库中的相对路径 (例如："/static/uploads/xxx.png")
         relative_path = img_obj.img_url
 
-        # 2. 去掉开头的斜杠，变成 "static/uploads/xxx.png"
+        # 去掉开头的斜杠，变成 "static/uploads/xxx.png"
         clean_path = relative_path.lstrip('/')
 
-        # 3. 直接拼接当前工作目录 (main.py 所在目录)
+        # 直接拼接当前工作目录 (main.py 所在目录)
         # 结果：/your/project/path/static/uploads/xxx.png
         file_path = os.path.join(os.getcwd(), clean_path)
 

@@ -13,9 +13,7 @@ from models.category_model import Category
 # 初始化路由
 product_router = APIRouter(prefix="/product", tags=["产品管理"])
 
-# =============================================================================
-# 1. 请求模型（带 if_main，全部修复）
-# =============================================================================
+
 class RobotSaveRequest(BaseModel):
     id: Optional[int] = None
     product_name: str
@@ -61,9 +59,8 @@ class SportSaveRequest(BaseModel):
 
     model_config = {"from_attributes": True}
 
-# =============================================================================
-# 2. 响应模型
-# =============================================================================
+
+# 响应模型
 class RobotDetailResponse(BaseModel):
     id: int
     product_name: str
@@ -137,9 +134,8 @@ PRODUCT_TYPE_MAPPING: Dict[str, Dict] = {
     "sport": {"model": SportProduct, "response_schema": SportDetailResponse},
 }
 
-# =============================================================================
-# 3. 工具函数
-# =============================================================================
+
+# 工具函数
 def get_category_path(db: Session, category_id: int) -> str:
     cat = db.query(Category).filter(Category.id == category_id).first()
     if not cat:
@@ -155,9 +151,7 @@ def get_category_path(db: Session, category_id: int) -> str:
             break
     return " / ".join(path_parts)
 
-# =============================================================================
-# 4. 接口（全部恢复 if_main）
-# =============================================================================
+
 
 # 产品详情
 @product_router.get("/detail/{product_type}/{product_id}")
@@ -169,7 +163,7 @@ def get_product_detail(product_type: str, product_id: int, db: Session = Depends
     if not item:
         raise HTTPException(404, "产品不存在")
 
-    # ✅ 修复这里
+
     return {"code":200,"data":product_info["response_schema"].model_validate(item)}
 
 # 首页产品（if_main = True）
@@ -203,7 +197,7 @@ def get_main_products(
     end = start + page_size
     items = all_items[start:end]
 
-    # ====================== 这里完全按照 list 接口返回 ======================
+    # ======================  list 接口返回 ======================
     data = []
     for item in items:
         data.append({

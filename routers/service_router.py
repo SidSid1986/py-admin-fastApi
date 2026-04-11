@@ -75,11 +75,11 @@ async def upload_rich_text_image(file: UploadFile = File(...)):
     专门供 WangEditor 使用的图片上传接口
     不需要存入数据库，只需保存文件并返回 URL
     """
-    # 1. 校验文件类型
+    # 校验文件类型
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="只能上传图片文件")
 
-    # 2. 提取后缀
+    # 提取后缀
     original_filename = file.filename or "image.png"
     if "." in original_filename:
         ext = original_filename.rsplit(".", 1)[1].lower()
@@ -91,31 +91,29 @@ async def upload_rich_text_image(file: UploadFile = File(...)):
     if ext not in allowed_exts:
         raise HTTPException(status_code=400, detail=f"不支持的格式：{ext}")
 
-    # 3. 生成唯一文件名 (防止覆盖)
+    # 生成唯一文件名 (防止覆盖)
     # 格式：uuid + .ext
     unique_filename = f"{uuid.uuid4()}.{ext}"
 
-    # 4. 构建物理路径
+    # 构建物理路径
     file_path = os.path.join(UPLOAD_DIR, unique_filename)
 
-    # 5. 保存文件
+    # 保存文件
     try:
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"保存失败：{str(e)}")
 
-    # 6. 构建访问 URL
-    # 关键点：这里必须是前端能访问到的 HTTP 地址
-    # 假设你的 FastAPI 启动了 static 目录映射，且前缀是 /static
+    # 构建访问 URL
     image_url = f"/static/uploads/service/{unique_filename}"
 
-    # 7. 返回 WangEditor 需要的格式
-    # 你的前端代码期待：{ code: 200, data: { url: "..." } }
+
+    # { code: 200, data: { url: "..." } }
     return {
         "code": 200,
         "msg": "上传成功",
         "data": {
-            "url": image_url  # 这里的 key 必须是 url
+            "url": image_url
         }
     }

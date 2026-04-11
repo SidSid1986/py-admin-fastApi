@@ -12,19 +12,19 @@ class Category(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(50), nullable=False, comment="分类名称")
 
-    # --- 树形结构核心字段 (自关联) ---
+    # --- 树形结构 (自关联) ---
     # ondelete="CASCADE": 当父分类被删除时，数据库层面会自动删除子分类
     parent_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=True, index=True,
                        comment="父分类ID (NULL表示一级分类)")
 
-    # 自关联关系：父 -> 子 (selectin 加载策略避免 N+1 问题)
+    # 自关联关系：父 -> 子
     children = relationship("Category", back_populates="parent", lazy="selectin", cascade="all, delete-orphan")
     # 自关联关系：子 -> 父
     parent = relationship("Category", back_populates="children", remote_side=[id])
 
-    # --- 【新增】产品类型标识字段 ---
+    # --- 产品类型标识字段 ---
     # 仅当 parent_id 为 NULL (一级分类) 时填写此字段
-    # 子分类自动继承父级的 type，无需重复存储，或在逻辑层处理
+    # 子分类自动继承父级的 type
     # 枚举值示例: "robot", "sport", "servo", "sensor"
     category_type = Column(String(50), nullable=True, index=True, comment="产品类型标识 (仅一级分类有效)")
 
@@ -37,15 +37,11 @@ class Category(Base):
     # ==========================================
     # 关联说明
     # ==========================================
-    # 此处不直接关联 Product 表，因为产品分散在不同表中。
-    # 删除校验逻辑应在 Service 层实现：
-    # "如果是一级分类，检查其下所有子分类是否关联了任何产品表的数据"
-    # ==========================================
-
+    #  直接关联 Product 表， 产品分散在不同表中。
     __table_args__ = (
-        # 复合索引：加速按父级和排序的查询
+        #加速按父级和排序的查询
         Index('idx_parent_sort', 'parent_id', 'sort_order'),
-        # 新增：加速按类型筛选分类 (虽然主要靠 ID 查，但备用)
+        # 加速按类型筛选分类
         Index('idx_category_type', 'category_type'),
     )
 
@@ -64,12 +60,11 @@ class Category(Base):
             "status": 1 if self.is_active else 0,
             "createTime": self.create_time.strftime("%Y-%m-%d %H:%M:%S") if self.create_time else None,
 
-            # === 新增：返回类型字段 ===
+            # === 返回类型字段 ===
             "category_type": self.category_type,
         }
 
         # 如果需要统计产品数量，这里暂时返回 0
-        # 实际业务中，建议在 Router/Service 层查询完树后，遍历节点并异步填充真实数量
         if include_product_count:
             data["productCount"] = 0
 
@@ -80,7 +75,7 @@ class Category(Base):
             data["children"] = [
                 child.to_dict(
                     include_children=True,
-                    include_product_count=False  # 递归深层时通常不查数量，保证性能
+                    include_product_count=False
                 )
                 for child in sorted_children
             ]

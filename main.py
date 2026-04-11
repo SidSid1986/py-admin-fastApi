@@ -26,6 +26,15 @@ from routers.product_router import product_router
 #上传图片(通用)
 from routers.common_router import common_router
 
+#工艺
+from routers.process_router import process_router
+
+# 部署
+from routers.deploy_router import deploy_router
+
+# 聊天
+from routers.chat_router import chat_router
+
 
 GLOBAL_PREFIX = "/api"
 
@@ -64,6 +73,14 @@ app.include_router(category_router, prefix=GLOBAL_PREFIX)
 app.include_router(product_router, prefix=GLOBAL_PREFIX)
 app.include_router(common_router, prefix=GLOBAL_PREFIX)
 
+app.include_router(process_router, prefix=GLOBAL_PREFIX)
+
+# 部署
+app.include_router(deploy_router, prefix=GLOBAL_PREFIX)
+
+# 聊天（公众号）
+app.include_router(chat_router, prefix=GLOBAL_PREFIX)
+
 
 @app.get("/", summary="健康检查")
 def root():
@@ -77,7 +94,7 @@ def root():
     }
 
 
-# ====================== 新增启动代码 ======================
+# ======================  启动代码 ======================
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(

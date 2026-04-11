@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 category_router = APIRouter(prefix="/category", tags=["产品分类管理"])
 
-# --- 类型映射字典 (统一管理中英文) ---
+# --- 类型映射字典 ---
 TYPE_MAP: Dict[str, str] = {
     "robot": "机器人",
     "sport": "运动控制器",
@@ -20,7 +20,7 @@ def get_type_name(type_code: Optional[str]) -> str:
     """辅助函数：获取中文类型名"""
     if not type_code:
         return "未知类型"
-    return TYPE_MAP.get(type_code, type_code)  # 如果字典里没有，返回原值
+    return TYPE_MAP.get(type_code, type_code)
 
 
 # --- Pydantic 模型 ---
@@ -47,7 +47,7 @@ class CategoryResponse(BaseModel):
     # 原始代码
     category_type: Optional[str]
 
-    # === 新增：中文名称 ===
+    # === 中文名称 ===
     type_name: str
 
     children: List['CategoryResponse'] = []
@@ -63,7 +63,6 @@ def build_tree(nodes: List[Category], parent_id: Optional[int] = None) -> List[d
     children = [node for node in nodes if node.parent_id == parent_id]
 
     for node in children:
-        # 手动构建字典以便灵活控制字段
         node_dict = {
             "id": node.id,
             "label": node.name,
@@ -73,7 +72,6 @@ def build_tree(nodes: List[Category], parent_id: Optional[int] = None) -> List[d
             "status": 1 if node.is_active else 0,
             "createTime": node.create_time.strftime("%Y-%m-%d %H:%M:%S") if node.create_time else None,
             "category_type": node.category_type,
-            # === 核心修改：在此处计算中文名称 ===
             "type_name": get_type_name(node.category_type),
             "children": build_tree(nodes, node.id)
         }
@@ -105,7 +103,7 @@ def get_category_list(
 
     categories = query.order_by(Category.sort_order, Category.id).all()
 
-    # === 核心修改：手动构建返回列表，注入 type_name ===
+    # === 注入 type_name ===
     data_list = []
     for cat in categories:
         item = cat.to_dict(include_children=False)
@@ -116,11 +114,9 @@ def get_category_list(
     return {"code": 200, "msg": "success", "data": data_list}
 
 
-# ... (save 和 delete 接口保持不变，逻辑无需修改) ...
+
 @category_router.post("/save", summary="保存分类 (新增或更新)")
 def save_category(req: CategorySaveRequest, db: Session = Depends(get_db)):
-    # ... (保持原有逻辑不变) ...
-    # 为了完整性，这里简写，实际请使用你之前提供的完整 save 逻辑
     if req.parent_id is None and not req.category_type:
         raise HTTPException(status_code=400, detail="一级分类必须指定 category_type")
 
@@ -167,7 +163,6 @@ def save_category(req: CategorySaveRequest, db: Session = Depends(get_db)):
 
 @category_router.delete("/{category_id}", summary="删除分类")
 def delete_category(category_id: int, db: Session = Depends(get_db)):
-    # ... (保持原有逻辑不变) ...
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category: raise HTTPException(status_code=404, detail="分类不存在")
 

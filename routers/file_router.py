@@ -51,16 +51,11 @@ async def upload_file(
     """
     上传通用文件，返回文件信息
     """
-    # 1. 基础校验
+    # 基础校验
     if not file.filename:
         raise HTTPException(status_code=400, detail="文件名不能为空")
 
-    # 可选：限制文件大小 (例如 50MB)
-    # 注意：需要在 FastAPI 启动时配置 max_upload_size，这里做二次检查
-    # 简单检查：如果读取完发现太大再抛错，或者依赖中间件
-    # 这里假设由服务器配置限制，只做逻辑处理
-
-    # 2. 生成唯一文件名
+    # 生成唯一文件名
     original_filename = file.filename
     if "." in original_filename:
         ext = original_filename.rsplit(".", 1)[1].lower()
@@ -71,7 +66,7 @@ async def upload_file(
     file_path_rel = f"/static/uploads/files/{unique_filename}"
     file_path_abs = os.path.join(FILE_UPLOAD_DIR, unique_filename)
 
-    # 3. 保存文件
+    # 保存文件
     try:
         with open(file_path_abs, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -83,7 +78,7 @@ async def upload_file(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"文件保存失败：{str(e)}")
 
-    # 4. 存入数据库
+    # 存入数据库
     new_record = FileRecord(
         original_name=original_filename,
         stored_name=unique_filename,
@@ -110,12 +105,10 @@ async def upload_file(
     }
 
 
-# --- 2. 获取文件列表接口 ---
+# --- 获取文件列表接口 ---
 from sqlalchemy import desc, or_ # 确保导入 or_，虽然单字段搜索可能不需要，但搜索常用
 
-# ... (前面的代码保持不变)
-
-# --- 2. 获取文件列表接口 ---
+# --- 获取文件列表接口 ---
 @file_router.get("/list", summary="获取文件列表", response_model=FileListResponse)
 def get_file_list(
         page: int = Query(1, ge=1, description="页码"),
@@ -129,10 +122,10 @@ def get_file_list(
     # 计算偏移量
     offset = (page - 1) * page_size
 
-    # 2. 构建基础查询对象
+    # 构建基础查询对象
     query = db.query(FileRecord)
 
-    # 3. 如果有搜索关键字，添加模糊查询条件
+    # 如果有搜索关键字，添加模糊查询条件
     if keyword:
         # 使用 ilike 进行不区分大小写的模糊匹配 (PostgreSQL/SQLite 支持)
         # 如果是 MySQL，通常使用 like
@@ -166,13 +159,13 @@ def delete_file(
     """
     删除文件：同时删除数据库记录和本地物理文件
     """
-    # 1. 查找记录
+    # 查找记录
     record = db.query(FileRecord).filter(FileRecord.id == file_id).first()
 
     if not record:
         raise HTTPException(status_code=404, detail="文件记录不存在")
 
-    # 2. 构建物理路径
+    # 构建物理路径
     # 注意：record.file_path 是 /static/...，需要去掉 /static 映射到本地磁盘
     # 假设 project_root/static/uploads/files
     # 更稳妥的方式是利用 stored_name 重新构建，或者解析 path
@@ -180,7 +173,7 @@ def delete_file(
     file_name = record.stored_name
     file_path_abs = os.path.join(FILE_UPLOAD_DIR, file_name)
 
-    # 3. 删除物理文件
+    # 删除物理文件
     if os.path.exists(file_path_abs):
         try:
             os.remove(file_path_abs)
@@ -188,7 +181,7 @@ def delete_file(
             # 如果文件删除失败，可以选择回滚或不删除数据库，这里选择记录警告但继续删库
             print(f"Warning: 物理文件删除失败 {file_path_abs}: {e}")
 
-    # 4. 删除数据库记录
+    # 删除数据库记录
     db.delete(record)
     db.commit()
 

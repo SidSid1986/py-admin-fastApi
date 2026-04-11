@@ -67,7 +67,7 @@ class RobotProduct(Base):
 
 # =============================================================================
 # 2. 运动控制器产品表 (SportProduct)
-# 对应数据库表名: controllers
+# 对应数据库表名: sport
 # =============================================================================
 class SportProduct(Base):
     __tablename__ = "sport"
@@ -116,6 +116,6 @@ class SportProduct(Base):
     __table_args__ = (
         Index('idx_sport_category', 'category_id'),
         Index('idx_sport_active', 'is_active'),
-        Index('idx_sport_main', 'if_main'),  # ✅ 索引也加了
+        Index('idx_sport_main', 'if_main'),
         Index('idx_sport_model', 'model_number'),
     )

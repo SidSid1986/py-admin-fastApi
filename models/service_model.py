@@ -9,10 +9,10 @@ class ServiceContent(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     content = Column(Text, nullable=True, default="暂无服务内容")
 
-    # ✅ 修复后的写法（强制生成 CURRENT_TIMESTAMP）
+    # 强制生成 CURRENT_TIMESTAMP
     updated_at = Column(
         DateTime,
-        server_default='CURRENT_TIMESTAMP',  # 直接写字符串，最稳
+        server_default='CURRENT_TIMESTAMP',
         onupdate=func.now()
     )
 

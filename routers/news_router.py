@@ -17,7 +17,7 @@ NEWS_UPLOAD_DIR = "static/uploads/news"
 os.makedirs(NEWS_UPLOAD_DIR, exist_ok=True)
 
 
-# --- 1. 统一定义接收数据的模型 ---
+# --- 统一定义接收数据的模型 ---
 class NewsSaveRequest(BaseModel):
     id: Optional[int] = Field(None, description="新闻ID (有则更新，无则新增)")
     title: Optional[str] = Field(None, description="新闻标题")
@@ -28,14 +28,14 @@ class NewsSaveRequest(BaseModel):
     is_top: Optional[bool] = Field(None, description="是否置顶")
 
 
-# --- 统一保存接口 (新增/更新 二合一) ---
+# --- 保存接口 ---
 @news_router.post("/save", summary="保存新闻 (新增或更新)")
 def save_news(request: NewsSaveRequest, db: Session = Depends(get_db)):
     """
     智能保存 + 唯一置顶逻辑
     """
 
-    # --- 步骤 0: 处理“唯一置顶”逻辑 ---
+    # ---  处理“唯一置顶”逻辑 ---
     if request.is_top is True:
         if request.id:
             # 更新场景：把所有 id != 当前id 的置为 False
@@ -44,7 +44,7 @@ def save_news(request: NewsSaveRequest, db: Session = Depends(get_db)):
             # 新增场景：把所有现有的都置为 False
             db.query(News).update({"is_top": False})
 
-    # --- 步骤 1: 判断是新增还是更新 ---
+    # --- 判断是新增还是更新 ---
     news_record = None  # 用于最后返回 ID
 
     if request.id is None:
@@ -57,7 +57,7 @@ def save_news(request: NewsSaveRequest, db: Session = Depends(get_db)):
 
             new_news = News(
                 title=request.title,
-                summary=request.summary,  # 【新增】直接赋值，允许为 None
+                summary=request.summary,
                 content=request.content,
                 cover_image=request.cover_image or "",
                 publish_date=pub_date,
@@ -66,7 +66,7 @@ def save_news(request: NewsSaveRequest, db: Session = Depends(get_db)):
                 updated_at=datetime.now()
             )
             db.add(new_news)
-            news_record = new_news  # 记录引用以便后续刷新
+            news_record = new_news
 
         except ValueError as e:
             raise HTTPException(status_code=400, detail=f"日期格式错误: {str(e)}")
@@ -83,7 +83,7 @@ def save_news(request: NewsSaveRequest, db: Session = Depends(get_db)):
         # 动态更新提供的字段
         if request.title is not None:
             record.title = request.title
-        if request.summary is not None:  # 【新增】如果传了 summary 就更新，没传保持原样
+        if request.summary is not None:
             record.summary = request.summary
         if request.content is not None:
             record.content = request.content
@@ -101,7 +101,7 @@ def save_news(request: NewsSaveRequest, db: Session = Depends(get_db)):
         record.updated_at = datetime.now()
         news_record = record
 
-    # --- 步骤 2: 统一提交事务 ---
+    # --- 统一提交事务 ---
     try:
         db.commit()
         db.refresh(news_record)  # 刷新获取最新状态
@@ -132,19 +132,16 @@ def get_news_list(
             (News.summary.contains(keyword))
         )
 
-    # ==========================================
-    # 核心修改：分离查询策略
-    # ==========================================
 
-    # --- 第一步：单独查出所有“置顶”数据 ---
-    # 这部分数据不参与分页计算，永远作为“赠品”返回
+
+    # 单独查出所有“置顶”数据 ---
     top_query = base_query.filter(News.is_top == True)
     top_items = top_query.order_by(desc(News.publish_date)).all()
 
-    # --- 第二步：针对“非置顶”数据进行严格分页 ---
+    # ---针对“非置顶”数据进行严格分页 ---
     normal_query = base_query.filter(News.is_top == False)
 
-    # 计算普通数据的总数（用于前端计算总页数，注意这里只算普通的）
+    # 计算普通数据的总数
     total_normal_count = normal_query.count()
 
     # 计算偏移量：只根据普通数据的数量来算
@@ -155,7 +152,7 @@ def get_news_list(
     # 获取当前页的普通数据（严格限制数量）
     normal_items = normal_query.order_by(desc(News.publish_date)).offset(offset).limit(page_size).all()
 
-    # --- 第三步：合并数据 ---
+    # --- 合并数据 ---
     # 最终列表 = 置顶列表 + 当前页的普通列表
     # 结果长度 = 置顶数量 + page_size
     items = top_items + normal_items

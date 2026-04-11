@@ -8,6 +8,8 @@ from .industry_model import Industry
 from .solution_model import Solution
 from .category_model import Category
 from .product_model import RobotProduct, SportProduct
+from .process_model import Process
+from .chat_model import ChatMessage
 
 
 __all__ = [
@@ -19,5 +21,7 @@ __all__ = [
     "Industry",
     "Solution",
     "Category"
-    ,"RobotProduct", "SportProduct"
+    ,"RobotProduct", "SportProduct",
+    "Process",
+    "ChatMessage"
 ]

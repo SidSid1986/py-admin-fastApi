@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 industry_router = APIRouter(prefix="/industries", tags=["行业管理"])
 
 
-# --- 1. 统一定义接收数据的模型 (仅用于校验输入) ---
+# ---  统一定义接收数据的模型 ---
 class IndustrySaveRequest(BaseModel):
     id: Optional[int] = Field(None, description="行业ID (有则更新，无则新增)")
     name: str = Field(..., description="行业名称")
@@ -20,8 +20,7 @@ class IndustrySaveRequest(BaseModel):
     is_active: Optional[bool] = Field(True, description="是否启用")
 
 
-# --- 2. 统一保存接口 (新增/更新 二合一) ---
-# 注意：这里不写 response_model，直接返回 dict
+# --- 统一保存接口 (新增/更新 二合一) ---
 @industry_router.post("/save", summary="保存行业 (新增或更新)")
 def save_industry(req: IndustrySaveRequest, db: Session = Depends(get_db)):
     """
@@ -72,7 +71,7 @@ def save_industry(req: IndustrySaveRequest, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(industry_record)
 
-        # 【关键】手动构建返回字典，只返回必要信息 (id)，避免直接返回 ORM 对象导致序列化问题
+
         return {
             "code": 200,
             "msg": "保存成功",
@@ -83,9 +82,9 @@ def save_industry(req: IndustrySaveRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"保存失败: {str(e)}")
 
 
-# --- 3. 获取列表 ---
-# 注意：这里也不写 response_model
-# --- 3. 获取列表 ---
+
+
+# --- 获取列表 ---
 @industry_router.get("/list", summary="获取行业列表")
 def get_industry_list(
         only_active: bool = Query(True, description="是否只获取启用的行业"),
@@ -95,13 +94,9 @@ def get_industry_list(
     if only_active:
         query = query.filter(Industry.is_active == True)
 
-    # 【修改点】调整排序逻辑
-    # 1. asc(Industry.sort): 排序值越小，越靠前 (0, 1, 2...)
-    # 2. asc(Industry.id): 如果排序值相同，ID 越小（越早创建的）越靠前。
-    #    这样新增的数据（ID 大）自然会排在同 sort 值的后面。
     industries = query.order_by(
         asc(Industry.sort),
-        asc(Industry.id)  # 这里从 desc 改为 asc
+        asc(Industry.id)
     ).all()
 
     # 手动转换为字典列表
