@@ -43,6 +43,7 @@ app = FastAPI(title="首页图片与服务接口", version="1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "http://www.ytfreeie.com/",
         "http://localhost:3000",
         "http://localhost:8000",
         "http://127.0.0.1:8000",

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from sqlalchemy.dialects.mysql import JSON as MySQLJSON
 
-# 导入 Base，确保和你的数据库配置一致
+# 导入 Base
 from database import Base
 
 

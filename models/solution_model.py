@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from database import Base  # 假设你的 Base 在 database.py 中定义
+from database import Base
 from models.industry_model import Industry  # 导入 Industry 模型以建立关系
 
 

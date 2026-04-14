@@ -2,7 +2,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import get_db
-from models.process_model import Process  # 你的 Process 模型
+from models.process_model import Process
 from datetime import datetime
 from pydantic import BaseModel, Field
 from sqlalchemy import asc, desc
@@ -111,7 +111,7 @@ def get_process_list(
             "update_time": item.update_time.strftime("%Y-%m-%d %H:%M:%S") if item.update_time else None,
         })
 
-    # 返回格式和你 Solution 完全一致
+    # 返回格式
     return {
         "code": 200,
         "msg": "获取成功",
