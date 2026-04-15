@@ -118,3 +118,51 @@ async def download_wechat_image(dto: WechatImageDTO):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"微信图片处理失败：{str(e)}")
+
+
+
+# ===================== 视频上传接口（给 WangEditor 使用）=====================
+@common_router.post("/upload_video", summary="通用视频上传接口")
+async def upload_video(
+        file: UploadFile = File(...),
+        module: str = Form(default="default")
+):
+    if module not in ALLOWED_MODULES:
+        sub_dir = ALLOWED_MODULES["default"]
+    else:
+        sub_dir = ALLOWED_MODULES[module]
+
+    # 视频统一放到 videos 目录
+    upload_dir = os.path.join(BASE_UPLOAD_DIR, "videos", sub_dir)
+    os.makedirs(upload_dir, exist_ok=True)
+
+    # 校验是否是视频
+    if not file.content_type or not file.content_type.startswith("video/"):
+        raise HTTPException(status_code=400, detail="只能上传视频文件")
+
+    original_filename = file.filename or "video.mp4"
+    # 获取后缀
+    ext = original_filename.rsplit(".", 1)[1].lower() if "." in original_filename else "mp4"
+    # 允许的视频格式
+    allowed_exts = ["mp4", "mov", "avi", "flv", "wmv", "webm", "mkv"]
+    if ext not in allowed_exts:
+        raise HTTPException(status_code=400, detail=f"不支持的视频格式：{ext}")
+
+    # 唯一文件名
+    unique_filename = f"{uuid.uuid4()}.{ext}"
+    file_path = os.path.join(upload_dir, unique_filename)
+
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"视频保存失败：{str(e)}")
+
+    # 返回可访问 URL
+    video_url = f"/static/uploads/videos/{sub_dir}/{unique_filename}"
+
+    return {
+        "code": 200,
+        "msg": "视频上传成功",
+        "data": {"url": video_url}
+    }

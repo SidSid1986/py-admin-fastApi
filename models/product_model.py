@@ -8,7 +8,7 @@ from database import Base
 
 
 # =============================================================================
-# 1. 机器人产品表 (RobotProduct)
+# 1. 机器人产品表 (RobotProduct) —— 已重构
 # 对应数据库表名: robots
 # =============================================================================
 class RobotProduct(Base):
@@ -28,42 +28,40 @@ class RobotProduct(Base):
 
     category_path: Mapped[str | None] = mapped_column(String(200), nullable=True, comment="分类路径快照")
 
-    # --- 基础状态 ---
+    # --- 基础状态（保留） ---
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否上架")
-    if_main: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否首页展示")  # ✅ 已加
+    if_main: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否首页展示")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now,
                                                  comment="更新时间")
 
-    # --- 通用产品信息 ---
+    # --- 通用产品信息（保留） ---
     product_name: Mapped[str] = mapped_column(String(200), nullable=False, comment="产品名称")
     model_number: Mapped[str] = mapped_column(String(100), nullable=False, comment="产品型号")
     robot_type: Mapped[str] = mapped_column(String(50), nullable=False, default="", comment="机器人类型")
     main_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True, comment="产品主图URL")
 
-    # --- 机器人特有参数 ---
-    robot_name: Mapped[str] = mapped_column(String(100), nullable=False, comment="机器人型号标识")
+    # --- 核心机械参数（必须保留的4个关键字段） ---
     max_arm_span: Mapped[str | None] = mapped_column(String(50), nullable=True, comment="最大臂展")
     max_weight: Mapped[str | None] = mapped_column(String(50), nullable=True, comment="最大负载")
     switch_num: Mapped[str | None] = mapped_column(String(50), nullable=True, comment="轴数")
     weight: Mapped[str | None] = mapped_column(String(50), nullable=True, comment="本体重量")
-    perprecision: Mapped[str | None] = mapped_column(Text, nullable=True, comment="重复定位精度")
-    ip_level: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="防护等级")
-    ins_type: Mapped[str | None] = mapped_column(String(50), nullable=True, comment="安装形式")
-    drive_type: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="驱动方式")
-    auth_support: Mapped[str | None] = mapped_column(String(200), nullable=True, comment="支持认证")
-    ins_require: Mapped[str | None] = mapped_column(Text, nullable=True, comment="安装条件")
-    remark: Mapped[str | None] = mapped_column(Text, nullable=True, comment="备注说明")
-    detail_img: Mapped[str | None] = mapped_column(String(500), nullable=True, comment="详情图片")
 
-    # --- 索引优化 ---
+    # --- ✅ 自定义多表格数据（核心新字段）---
+    # 结构：[ { "name": "表格1名称", "rows": [ ["参数名", "参数值"], ["重复定位精度", "±0.02mm"], ... ] }, ... ]
+    custom_tables: Mapped[list | None] = mapped_column(
+        MySQLJSON,
+        nullable=True,
+        comment="自定义多表格数据，数组格式，每个元素包含表格名name + 表格行rows"
+    )
+
+    # --- 索引（保持不变） ---
     __table_args__ = (
         Index('idx_robot_category', 'category_id'),
         Index('idx_robot_active', 'is_active'),
-        Index('idx_robot_main', 'if_main'),  # ✅ 索引也加了
+        Index('idx_robot_main', 'if_main'),
         Index('idx_robot_model', 'model_number'),
     )
-
 
 # =============================================================================
 # 2. 运动控制器产品表 (SportProduct)
