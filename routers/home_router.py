@@ -152,39 +152,39 @@ async def upload_image(
     }
 
 
-@home_router.delete("/delete_image/{image_id}", summary="删除图片")
-def delete_image(image_id: int, db: Session = Depends(get_db)):
-    img_obj = db.query(HomeImage).filter(HomeImage.id == image_id).first()
-    if not img_obj:
-        raise HTTPException(status_code=404, detail="图片未找到")
-
-    # ===  物理文件删除逻辑 ===
-    try:
-        # 获取数据库中的相对路径 (例如："/static/uploads/xxx.png")
-        relative_path = img_obj.img_url
-
-        # 去掉开头的斜杠，变成 "static/uploads/xxx.png"
-        clean_path = relative_path.lstrip('/')
-
-        # 直接拼接当前工作目录 (main.py 所在目录)
-        # 结果：/your/project/path/static/uploads/xxx.png
-        file_path = os.path.join(os.getcwd(), clean_path)
-
-        print(f"尝试删除文件: {file_path}")  # 调试打印，方便看实际路径
-
-        # 4. 检查并删除
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            print("✅ 物理文件删除成功")
-        else:
-            print(f"⚠️ 文件不存在: {file_path}")
-
-    except Exception as e:
-        print(f"❌ 删除物理文件时出错: {e}")
-        # 这里可以选择是否抛出异常，通常记录日志即可，继续执行数据库删除
-
-    # === 删除数据库记录 ===
-    db.delete(img_obj)
-    db.commit()
-
-    return {"code": 200, "msg": "删除成功"}
+# @home_router.delete("/delete_image/{image_id}", summary="删除图片")
+# def delete_image(image_id: int, db: Session = Depends(get_db)):
+#     img_obj = db.query(HomeImage).filter(HomeImage.id == image_id).first()
+#     if not img_obj:
+#         raise HTTPException(status_code=404, detail="图片未找到")
+#
+#     # ===  物理文件删除逻辑 ===
+#     try:
+#         # 获取数据库中的相对路径 (例如："/static/uploads/xxx.png")
+#         relative_path = img_obj.img_url
+#
+#         # 去掉开头的斜杠，变成 "static/uploads/xxx.png"
+#         clean_path = relative_path.lstrip('/')
+#
+#         # 直接拼接当前工作目录 (main.py 所在目录)
+#         # 结果：/your/project/path/static/uploads/xxx.png
+#         file_path = os.path.join(os.getcwd(), clean_path)
+#
+#         print(f"尝试删除文件: {file_path}")  # 调试打印，方便看实际路径
+#
+#         # 4. 检查并删除
+#         if os.path.exists(file_path):
+#             os.remove(file_path)
+#             print("✅ 物理文件删除成功")
+#         else:
+#             print(f"⚠️ 文件不存在: {file_path}")
+#
+#     except Exception as e:
+#         print(f"❌ 删除物理文件时出错: {e}")
+#         # 这里可以选择是否抛出异常，通常记录日志即可，继续执行数据库删除
+#
+#     # === 删除数据库记录 ===
+#     db.delete(img_obj)
+#     db.commit()
+#
+#     return {"code": 200, "msg": "删除成功"}
