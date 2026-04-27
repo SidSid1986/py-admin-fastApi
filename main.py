@@ -36,6 +36,9 @@ from routers.deploy_router import deploy_router
 from routers.chat_router import chat_router
 
 
+
+
+
 GLOBAL_PREFIX = "/api"
 
 app = FastAPI(title="首页图片与服务接口", version="1.0")
@@ -43,7 +46,7 @@ app = FastAPI(title="首页图片与服务接口", version="1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://www.ytfreeie.com/",
+        "http://www.ytfreeie.com",
         "http://localhost:3000",
         "http://localhost:8000",
         "http://127.0.0.1:8000",
@@ -81,6 +84,8 @@ app.include_router(deploy_router, prefix=GLOBAL_PREFIX)
 
 # 聊天（公众号）
 app.include_router(chat_router, prefix=GLOBAL_PREFIX)
+
+
 
 
 @app.get("/", summary="健康检查")

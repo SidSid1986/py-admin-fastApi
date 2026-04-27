@@ -12,6 +12,7 @@ from .process_model import Process
 from .chat_model import ChatMessage
 
 
+
 __all__ = [
     "HomeImage",
     "ServiceContent",
@@ -23,5 +24,5 @@ __all__ = [
     "Category"
     ,"RobotProduct", "SportProduct",
     "Process",
-    "ChatMessage"
+    "ChatMessage",
 ]

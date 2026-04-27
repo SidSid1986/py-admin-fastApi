@@ -82,14 +82,14 @@ def delete_image(
 
         if os.path.exists(file_path):
             os.remove(file_path)
-            print(f"✅ 已删除文件: {file_path}")
+            print(f"已删除文件: {file_path}")
 
         # 2. 删除数据库记录（根据 url 删除，最稳定）
         img_obj = db.query(HomeImage).filter(HomeImage.img_url == img_url).first()
         if img_obj:
             db.delete(img_obj)
             db.commit()
-            print(f"✅ 已删除数据库记录: {img_url}")
+            print(f"已删除数据库记录: {img_url}")
 
         return {
             "code": 200,

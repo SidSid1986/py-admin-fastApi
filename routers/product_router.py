@@ -3,26 +3,23 @@ import os
 import shutil
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Depends
 from pydantic import BaseModel
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any, Union
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_
 from datetime import datetime
 from database import get_db
-from models import RobotProduct, SportProduct  # 使用你的模型
-from models.category_model import Category  # 分类模型
+from models import RobotProduct, SportProduct
+from models.category_model import Category
 
 product_router = APIRouter(prefix="/product", tags=["产品管理"])
 
 
-# =============================================================================
-# ✅ 统一上传接口
-# =============================================================================
+# 统一图片上传接口
 @product_router.post("/upload", summary="统一图片上传接口")
 async def upload_image(
         file: UploadFile = File(...),
         folder: str = Query("common", description="上传目录名")
 ):
-    """统一上传接口，返回图片URL"""
     if not file.content_type.startswith("image/"):
         raise HTTPException(400, "只能上传图片文件")
 
@@ -40,9 +37,7 @@ async def upload_image(
     return {"code": 200, "data": {"url": url}}
 
 
-# =============================================================================
-# ✅ 请求体定义
-# =============================================================================
+# 请求体
 class RobotSaveRequest(BaseModel):
     id: Optional[int] = None
     product_name: str
@@ -52,6 +47,8 @@ class RobotSaveRequest(BaseModel):
     if_main: Optional[int] = 0
     is_active: Optional[bool] = True
     main_image_url: Optional[str] = None
+    img: Optional[str] = None
+    images: Optional[List[str]] = None
     max_arm_span: Optional[str] = None
     max_weight: Optional[str] = None
     switch_num: Optional[str] = None
@@ -68,19 +65,15 @@ class SportSaveRequest(BaseModel):
     if_main: Optional[int] = 0
     is_active: Optional[bool] = True
     main_image_url: Optional[str] = None
-    name: Optional[str] = None
+    name: Optional[str] = ""
     detail: Optional[str] = None
     img: Optional[str] = None
-    line1: Optional[str] = None
-    line2: Optional[str] = None
-    line3: Optional[str] = None
-    sport_pram: Optional[dict] = None
-    sport_pram_two: Optional[dict] = None
+    images: Optional[List[str]] = None
+    selling_points: Optional[List[Dict[str, Union[str, int]]]] = None
+    custom_tables: Optional[List[Dict]] = None
 
 
-# =============================================================================
-# ✅ 产品列表
-# =============================================================================
+# 产品列表
 @product_router.get("/list")
 def get_product_list(
         page: int = 1,
@@ -90,7 +83,6 @@ def get_product_list(
         product_type: Optional[str] = None,
         db: Session = Depends(get_db)
 ):
-    """获取产品列表"""
     models = []
     if product_type == "robot":
         models.append(RobotProduct)
@@ -121,6 +113,8 @@ def get_product_list(
             "modelNumber": item.model_number,
             "mainImageUrl": item.main_image_url or "",
             "categoryId": item.category_id,
+            "img": item.img or "",
+            "images": item.images or [],
             "categoryPath": get_category_path(db, item.category_id),
             "robotType": item.robot_type,
             "productType": "robot" if isinstance(item, RobotProduct) else "sport",
@@ -132,14 +126,10 @@ def get_product_list(
     return {"code": 200, "total": total, "data": data}
 
 
-# =============================================================================
-# ✅ 机器人产品操作
-# =============================================================================
+# 机器人保存
 @product_router.post("/robot/save")
 def save_robot(request: RobotSaveRequest, db: Session = Depends(get_db)):
-    """保存机器人产品"""
     if not request.id:
-        # 新增产品
         item = RobotProduct(
             product_name=request.product_name,
             model_number=request.model_number,
@@ -148,6 +138,8 @@ def save_robot(request: RobotSaveRequest, db: Session = Depends(get_db)):
             is_active=request.is_active,
             if_main=request.if_main == 1,
             main_image_url=request.main_image_url,
+            img=request.img,
+            images=request.images,
             max_arm_span=request.max_arm_span,
             max_weight=request.max_weight,
             switch_num=request.switch_num,
@@ -156,7 +148,6 @@ def save_robot(request: RobotSaveRequest, db: Session = Depends(get_db)):
         )
         db.add(item)
     else:
-        # 更新产品
         item = db.query(RobotProduct).filter(RobotProduct.id == request.id).first()
         if not item:
             raise HTTPException(404, "产品不存在")
@@ -168,6 +159,8 @@ def save_robot(request: RobotSaveRequest, db: Session = Depends(get_db)):
         item.is_active = request.is_active
         item.if_main = request.if_main == 1
         item.main_image_url = request.main_image_url
+        item.img = request.img
+        item.images = request.images
         item.max_arm_span = request.max_arm_span
         item.max_weight = request.max_weight
         item.switch_num = request.switch_num
@@ -180,7 +173,6 @@ def save_robot(request: RobotSaveRequest, db: Session = Depends(get_db)):
 
 @product_router.get("/robot/{robot_id}")
 def get_robot_detail(robot_id: int, db: Session = Depends(get_db)):
-    """获取机器人详情"""
     item = db.query(RobotProduct).filter(RobotProduct.id == robot_id).first()
     if not item:
         raise HTTPException(404, "产品不存在")
@@ -192,6 +184,8 @@ def get_robot_detail(robot_id: int, db: Session = Depends(get_db)):
             "product_name": item.product_name,
             "model_number": item.model_number,
             "main_image_url": item.main_image_url,
+            "img": item.img or "",
+            "images": item.images or [],
             "max_arm_span": item.max_arm_span,
             "max_weight": item.max_weight,
             "switch_num": item.switch_num,
@@ -203,14 +197,10 @@ def get_robot_detail(robot_id: int, db: Session = Depends(get_db)):
     }
 
 
-# =============================================================================
-# ✅ 运动控制器产品操作
-# =============================================================================
+# 运动产品保存
 @product_router.post("/sport/save")
 def save_sport(request: SportSaveRequest, db: Session = Depends(get_db)):
-    """保存运动控制器产品"""
     if not request.id:
-        # 新增产品
         item = SportProduct(
             product_name=request.product_name,
             model_number=request.model_number,
@@ -219,18 +209,15 @@ def save_sport(request: SportSaveRequest, db: Session = Depends(get_db)):
             is_active=request.is_active,
             if_main=request.if_main == 1,
             main_image_url=request.main_image_url,
-            name=request.name,
+            name=request.name or "",
             detail=request.detail,
             img=request.img,
-            line1=request.line1,
-            line2=request.line2,
-            line3=request.line3,
-            sport_pram=request.sport_pram,
-            sport_pram_two=request.sport_pram_two
+            images=request.images,
+            selling_points=request.selling_points,
+            custom_tables=request.custom_tables
         )
         db.add(item)
     else:
-        # 更新产品
         item = db.query(SportProduct).filter(SportProduct.id == request.id).first()
         if not item:
             raise HTTPException(404, "产品不存在")
@@ -242,14 +229,12 @@ def save_sport(request: SportSaveRequest, db: Session = Depends(get_db)):
         item.is_active = request.is_active
         item.if_main = request.if_main == 1
         item.main_image_url = request.main_image_url
-        item.name = request.name
+        item.name = request.name or ""
         item.detail = request.detail
         item.img = request.img
-        item.line1 = request.line1
-        item.line2 = request.line2
-        item.line3 = request.line3
-        item.sport_pram = request.sport_pram
-        item.sport_pram_two = request.sport_pram_two
+        item.images = request.images
+        item.selling_points = request.selling_points
+        item.custom_tables = request.custom_tables
         item.updated_at = datetime.now()
 
     db.commit()
@@ -258,7 +243,6 @@ def save_sport(request: SportSaveRequest, db: Session = Depends(get_db)):
 
 @product_router.get("/sport/{sport_id}")
 def get_sport_detail(sport_id: int, db: Session = Depends(get_db)):
-    """获取运动控制器详情"""
     item = db.query(SportProduct).filter(SportProduct.id == sport_id).first()
     if not item:
         raise HTTPException(404, "产品不存在")
@@ -272,27 +256,19 @@ def get_sport_detail(sport_id: int, db: Session = Depends(get_db)):
             "main_image_url": item.main_image_url,
             "name": item.name,
             "detail": item.detail,
-            "img": item.img,
-            "line1": item.line1,
-            "line2": item.line2,
-            "line3": item.line3,
-            "sport_pram": item.sport_pram,
-            "sport_pram_two": item.sport_pram_two,
+            "img": item.img or "",
+            "images": item.images or [],
+            "selling_points": item.selling_points,
+            "custom_tables": item.custom_tables or [],
             "is_active": item.is_active,
             "if_main": item.if_main
         }
     }
 
 
-# =============================================================================
-# ✅ 通用产品详情
-# =============================================================================
-# =============================================================================
-# ✅ 通用产品详情
-# =============================================================================
+# 通用详情
 @product_router.get("/detail/{product_type}/{product_id}")
 def get_product_detail(product_type: str, product_id: int, db: Session = Depends(get_db)):
-    """获取产品详情"""
     model = RobotProduct if product_type == "robot" else SportProduct
     item = db.query(model).filter(model.id == product_id).first()
     if not item:
@@ -310,7 +286,9 @@ def get_product_detail(product_type: str, product_id: int, db: Session = Depends
         "created_at": item.created_at,
         "updated_at": item.updated_at,
         "product_type": product_type,
-        "robot_type": item.robot_type  # <--- 添加这一行
+        "robot_type": item.robot_type,
+        "img": item.img or "",
+        "images": item.images or []
     }
 
     if product_type == "robot":
@@ -325,20 +303,13 @@ def get_product_detail(product_type: str, product_id: int, db: Session = Depends
         base_data.update({
             "name": item.name,
             "detail": item.detail,
-            "img": item.img,
-            "line1": item.line1,
-            "line2": item.line2,
-            "line3": item.line3,
-            "sport_pram": item.sport_pram,
-            "sport_pram_two": item.sport_pram_two
+            "selling_points": item.selling_points,
+            "custom_tables": item.custom_tables or []
         })
 
     return {"code": 200, "data": base_data}
 
 
-# =============================================================================
-# ✅ 首页产品
-# =============================================================================
 @product_router.get("/main/products")
 def get_main_products(
         page: int = 1,
@@ -346,7 +317,6 @@ def get_main_products(
         product_type: Optional[str] = None,
         db: Session = Depends(get_db)
 ):
-    """获取首页展示产品"""
     models = []
     if product_type == "robot":
         models.append(RobotProduct)
@@ -373,6 +343,8 @@ def get_main_products(
             "modelNumber": item.model_number,
             "mainImageUrl": item.main_image_url or "",
             "categoryId": item.category_id,
+            "img": item.img or "",
+            "images": item.images or [],
             "categoryPath": get_category_path(db, item.category_id),
             "robotType": item.robot_type,
             "productType": "robot" if isinstance(item, RobotProduct) else "sport",
@@ -384,36 +356,43 @@ def get_main_products(
     return {"code": 200, "total": total, "data": data}
 
 
-# =============================================================================
-# ✅ 删除产品
-# =============================================================================
+# 删除产品
 @product_router.delete("/{product_id}")
 def delete_product(product_id: int, db: Session = Depends(get_db)):
-    """删除产品"""
-    # 尝试删除机器人产品
     robot_item = db.query(RobotProduct).filter(RobotProduct.id == product_id).first()
     if robot_item:
-        # 删除图片文件
         if robot_item.main_image_url:
             delete_image_file(robot_item.main_image_url)
+        if robot_item.img:
+            delete_image_file(robot_item.img)
+        if robot_item.images:
+            for url in robot_item.images:
+                delete_image_file(url)
         if robot_item.custom_tables:
             for table in robot_item.custom_tables:
-                if "image_url" in table and table["image_url"]:
-                    delete_image_file(table["image_url"])
-
+                if "images" in table and table["images"]:
+                    for image_obj in table["images"]:
+                        if "url" in image_obj and image_obj["url"]:
+                            delete_image_file(image_obj["url"])
         db.delete(robot_item)
         db.commit()
         return {"code": 200, "msg": "删除成功"}
 
-    # 尝试删除运动控制器产品
     sport_item = db.query(SportProduct).filter(SportProduct.id == product_id).first()
     if sport_item:
-        # 删除图片文件
         if sport_item.main_image_url:
             delete_image_file(sport_item.main_image_url)
         if sport_item.img:
             delete_image_file(sport_item.img)
-
+        if sport_item.images:
+            for url in sport_item.images:
+                delete_image_file(url)
+        if sport_item.custom_tables:
+            for table in sport_item.custom_tables:
+                if "images" in table and table["images"]:
+                    for image_obj in table["images"]:
+                        if "url" in image_obj and image_obj["url"]:
+                            delete_image_file(image_obj["url"])
         db.delete(sport_item)
         db.commit()
         return {"code": 200, "msg": "删除成功"}
@@ -421,11 +400,8 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
     raise HTTPException(404, "产品不存在")
 
 
-# =============================================================================
-# ✅ 辅助函数
-# =============================================================================
+# 辅助
 def get_category_path(db: Session, category_id: int) -> str:
-    """获取分类路径"""
     cat = db.query(Category).filter(Category.id == category_id).first()
     if not cat:
         return "未知分类"
@@ -441,7 +417,6 @@ def get_category_path(db: Session, category_id: int) -> str:
 
 
 def delete_image_file(url: str):
-    """删除图片文件"""
     try:
         p = url.lstrip("/")
         if os.path.exists(p):

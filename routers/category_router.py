@@ -4,7 +4,7 @@ from typing import List, Optional, Dict
 from database import get_db
 from models.category_model import Category
 from pydantic import BaseModel, Field
-
+from models import RobotProduct, SportProduct
 category_router = APIRouter(prefix="/category", tags=["产品分类管理"])
 
 # --- 类型映射字典 ---
@@ -32,7 +32,7 @@ class CategorySaveRequest(BaseModel):
     sort_order: int = Field(0, description="排序权重")
     is_active: bool = Field(True, description="是否启用")
     category_type: Optional[str] = Field(None, max_length=50, description="产品类型代码")
-
+    img: Optional[str] = Field(None, description="分类图片")
 
 class CategoryResponse(BaseModel):
     """统一响应模型，包含中文名称"""
@@ -73,6 +73,7 @@ def build_tree(nodes: List[Category], parent_id: Optional[int] = None) -> List[d
             "createTime": node.create_time.strftime("%Y-%m-%d %H:%M:%S") if node.create_time else None,
             "category_type": node.category_type,
             "type_name": get_type_name(node.category_type),
+            "img": node.img,
             "children": build_tree(nodes, node.id)
         }
         tree.append(node_dict)
@@ -114,23 +115,39 @@ def get_category_list(
     return {"code": 200, "msg": "success", "data": data_list}
 
 
-
 @category_router.post("/save", summary="保存分类 (新增或更新)")
 def save_category(req: CategorySaveRequest, db: Session = Depends(get_db)):
-    if req.parent_id is None and not req.category_type:
-        raise HTTPException(status_code=400, detail="一级分类必须指定 category_type")
+    # 一级分类必须传类型
+    if req.parent_id is None:
+        if not req.category_type:
+            raise HTTPException(status_code=400, detail="一级分类必须指定 category_type")
 
+    # 有父级 → 自动继承顶级分类的类型
     if req.parent_id is not None:
-        req.category_type = None  # 强制子分类为空
         parent = db.query(Category).filter(Category.id == req.parent_id).first()
-        if not parent: raise HTTPException(status_code=400, detail="父分类不存在")
-        if req.id and req.id == req.parent_id: raise HTTPException(status_code=400, detail="不能设为自己的父级")
+        if not parent:
+            raise HTTPException(status_code=400, detail="父分类不存在")
+
+        # 向上查找顶级分类
+        top_parent = parent
+        while top_parent.parent_id is not None:
+            top_parent = db.query(Category).filter(Category.id == top_parent.parent_id).first()
+            if not top_parent:
+                break
+
+        # 自动继承顶级类型 ✅
+        req.category_type = top_parent.category_type
+
+    # 不能选自己当父级
+    if req.id and req.id == req.parent_id:
+        raise HTTPException(status_code=400, detail="不能设为自己的父级")
 
     if req.id is not None:
         category = db.query(Category).filter(Category.id == req.id).first()
-        if not category: raise HTTPException(status_code=404, detail="分类不存在")
+        if not category:
+            raise HTTPException(status_code=404, detail="分类不存在")
 
-        # 检查子升父的逻辑
+        # 提升为一级分类必须指定类型
         if category.parent_id is not None and req.parent_id is None and not req.category_type:
             raise HTTPException(status_code=400, detail="提升为一级分类需指定类型")
 
@@ -139,14 +156,20 @@ def save_category(req: CategorySaveRequest, db: Session = Depends(get_db)):
         category.sort_order = req.sort_order
         category.is_active = req.is_active
         category.category_type = req.category_type
+        category.img = req.img
         action_msg = "更新成功"
     else:
         existing = db.query(Category).filter(Category.name == req.name, Category.parent_id == req.parent_id).first()
-        if existing: raise HTTPException(status_code=400, detail="同名分类已存在")
+        if existing:
+            raise HTTPException(status_code=400, detail="同名分类已存在")
 
         category = Category(
-            name=req.name, parent_id=req.parent_id, sort_order=req.sort_order,
-            is_active=req.is_active, category_type=req.category_type
+            name=req.name,
+            parent_id=req.parent_id,
+            sort_order=req.sort_order,
+            is_active=req.is_active,
+            category_type=req.category_type,
+            img = req.img,
         )
         db.add(category)
         action_msg = "新增成功"
@@ -154,22 +177,25 @@ def save_category(req: CategorySaveRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(category)
 
-    # 返回时也要带上 type_name
     result = category.to_dict()
     result["type_name"] = get_type_name(category.category_type)
 
     return {"code": 200, "msg": action_msg, "data": result}
 
 
-@category_router.delete("/{category_id}", summary="删除分类")
+@category_router.delete("/{category_id}")
 def delete_category(category_id: int, db: Session = Depends(get_db)):
-    category = db.query(Category).filter(Category.id == category_id).first()
-    if not category: raise HTTPException(status_code=404, detail="分类不存在")
+    # 1. 找到分类
+    cat = db.query(Category).filter(Category.id == category_id).first()
+    if not cat:
+        raise HTTPException(404, "分类不存在")
 
-    children_count = db.query(Category).filter(Category.parent_id == category_id).count()
-    if children_count > 0:
-        raise HTTPException(status_code=400, detail=f"无法删除：该分类下还有 {children_count} 个子分类。")
+    # 2. 强制把所有使用该分类的产品 category_id 设为 NULL
+    db.query(RobotProduct).filter(RobotProduct.category_id == category_id).update({RobotProduct.category_id: None})
+    db.query(SportProduct).filter(SportProduct.category_id == category_id).update({SportProduct.category_id: None})
 
-    db.delete(category)
+    # 3. 直接删除分类（不管有没有子分类，直接删）
+    db.delete(cat)
     db.commit()
+
     return {"code": 200, "msg": "删除成功"}

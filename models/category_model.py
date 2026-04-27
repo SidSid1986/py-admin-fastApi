@@ -5,6 +5,7 @@ from datetime import datetime
 from database import Base
 
 
+
 class Category(Base):
     __tablename__ = "categories"
 
@@ -27,6 +28,7 @@ class Category(Base):
     # 子分类自动继承父级的 type
     # 枚举值示例: "robot", "sport", "servo", "sensor"
     category_type = Column(String(50), nullable=True, index=True, comment="产品类型标识 (仅一级分类有效)")
+    img = Column(String(255), nullable=True, comment="分类图片")
 
     # --- 其他业务字段 ---
     sort_order = Column(Integer, default=0, comment="排序权重")
@@ -62,6 +64,8 @@ class Category(Base):
 
             # === 返回类型字段 ===
             "category_type": self.category_type,
+            "img": self.img,  # <-- 分类图片
+
         }
 
         # 如果需要统计产品数量，这里暂时返回 0
